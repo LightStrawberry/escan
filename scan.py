@@ -6,58 +6,95 @@ import asyncio
 import aiodns
 import requests
 import json
+import argparse
 
-tasks = []
+
+class Escan():
+    def __init__(self, target_domain, output_path, show_expired, domain_dict):
+        self.target_domain = target_domain
+        self.output_path = output_path
+        self.show_expired = show_expired
+        self.subdomains = []
+        if domain_dict:
+            self.domain_dict = domain_dict
+        else:
+            self.domain_dict = './bitquark_20160227_subdomains_popular_1000'
+        self.dns = "114.114.114.114"
 
 
-def dns_scan():
-    print(sys.argv[1])
-    domain = sys.argv[1]
+    def dns_scan(self):
+        loop = asyncio.get_event_loop()
+        dns = "114.114.114.114"
+        subdomains = []
 
-    loop = asyncio.get_event_loop()
+        with open(self.domain_dict) as f:
+            for domain_keyword in f:
+                domain_keyword = domain_keyword.strip()
+                subdomain = domain_keyword+'.'+self.target_domain
 
-    dns = "114.114.114.114"
+                try:
+                    resolver = aiodns.DNSResolver(loop=loop, nameservers=[self.dns])
+                    f = resolver.query(subdomain, 'A')
+                    result = loop.run_until_complete(f)
+                    print("[-] {s}".format(s=subdomain))
+                    subdomains.append(subdomain)
+                except Exception as e:
+                    result = "NO DNS"
+                    #print("NO DNS")
+        loop.close()
+        return subdomains
 
-    with open('./bitquark_20160227_subdomains_popular_1000') as f:
-        for domain_keyword in f:
-            domain_keyword = domain_keyword.strip()
-            subdomain = domain_keyword+'.'+domain
 
+    def ctfr_scan(self):
+        subdomains = []
+
+        req = requests.get("https://crt.sh/?q=%.{d}&output=json".format(d=self.target_domain))
+
+        if req.status_code != 200:
+            print("[X] Information not available!")
+            exit(1)
+
+        json_data = json.loads('[{}]'.format(req.text.replace('}{', '},{')))
+
+        for (key,value) in enumerate(json_data):
+            subdomains.append(value['name_value'])
+
+        subdomains = sorted(set(subdomains))
+        loop = asyncio.get_event_loop()
+        for s in subdomains:
             try:
-                resolver = aiodns.DNSResolver(loop=loop, nameservers=[dns])
-                f = resolver.query(subdomain, 'A')
+                resolver = aiodns.DNSResolver(loop=loop, nameservers=[self.dns])
+                f = resolver.query(s, 'A')
                 result = loop.run_until_complete(f)
-                print(subdomain)
+                print("[-] {s}".format(s=s))
             except Exception as e:
-                result = "NO DNS"
-                #print("NO DNS")
-
-    loop.close()
+                #print("error")
+                pass
 
 
-def ctfr_scan():
 
-    domain = sys.argv[1]
-    target = domain
-    subdomains = []
+    def search_engine_scan(self):
+        pass
 
-    req = requests.get("https://crt.sh/?q=%.{d}&output=json".format(d=target))
 
-    if req.status_code != 200:
-        print("[X] Information not available!")
-        exit(1)
+    def output_result(self):
+        pass
 
-    json_data = json.loads('[{}]'.format(req.text.replace('}{', '},{')))
-
-    #for (key,value) in enumerate(json_data):
-    #    subdomains.append(value['name_value'])
-
-    print(json_data)
 
 
 def main():
-    #dns_scan()
-    ctfr_scan()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', dest="target_domain", type=str, help="target domain")
+    parser.add_argument('-o', dest="output_path", type=str, help="output path")
+    parser.add_argument('-e', dest="show_expired", type=str, help="show expired")
+    parser.add_argument('-D', dest="subdomain_dict", type=str, help="subdomain dict path")
+    args = parser.parse_args()
+
+    escan = Escan(args.target_domain, args.output_path, args.show_expired, args.subdomain_dict)
+
+    escan.dns_scan()
+    escan.ctfr_scan()
+    escan.output_result()
 
 if __name__ == '__main__':
     main()
