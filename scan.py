@@ -37,17 +37,15 @@ class Escan():
                     f = resolver.query(subdomain, 'A')
                     result = loop.run_until_complete(f)
                     print("[-] {s}".format(s=subdomain))
-                    subdomains.append(subdomain)
+                    self.subdomains.append(subdomain)
                 except Exception as e:
                     result = "NO DNS"
                     #print("NO DNS")
         loop.close()
-        return subdomains
 
 
     def ctfr_scan(self):
         subdomains = []
-
         req = requests.get("https://crt.sh/?q=%.{d}&output=json".format(d=self.target_domain))
 
         if req.status_code != 200:
@@ -60,17 +58,22 @@ class Escan():
             subdomains.append(value['name_value'])
 
         subdomains = sorted(set(subdomains))
-        loop = asyncio.get_event_loop()
-        for s in subdomains:
-            try:
-                resolver = aiodns.DNSResolver(loop=loop, nameservers=[self.dns])
-                f = resolver.query(s, 'A')
-                result = loop.run_until_complete(f)
-                print("[-] {s}".format(s=s))
-            except Exception as e:
-                #print("error")
-                pass
 
+        if self.show_expired:
+            loop = asyncio.get_event_loop()
+            for s in subdomains:
+                try:
+                    resolver = aiodns.DNSResolver(loop=loop, nameservers=[self.dns])
+                    f = resolver.query(s, 'A')
+                    result = loop.run_until_complete(f)
+                    print("[-] {s}".format(s=s))
+                    self.subdomains.append(s)
+                except Exception as e:
+                    pass
+        else:
+            for s in subdomains:
+                print("[-] {s}".format(s=s))
+                self.subdomains.append(s)
 
 
     def search_engine_scan(self):
@@ -78,23 +81,29 @@ class Escan():
 
 
     def output_result(self):
-        pass
-
+        subdomains = sorted(set(self.subdomains))
+        for s in subdomains:
+            with open(self.output_path,"a") as f:
+                f.write(s + '\n')
+                f.close()
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', dest="target_domain", type=str, help="target domain")
     parser.add_argument('-o', dest="output_path", type=str, help="output path")
-    parser.add_argument('-e', dest="show_expired", type=str, help="show expired")
+    parser.add_argument('-e', dest="show_expired", action="store_true", help="show expired")
     parser.add_argument('-D', dest="subdomain_dict", type=str, help="subdomain dict path")
     args = parser.parse_args()
 
     escan = Escan(args.target_domain, args.output_path, args.show_expired, args.subdomain_dict)
 
+    print("[*] start dns scan")
     escan.dns_scan()
+    print("[*] start ctfr scan")
     escan.ctfr_scan()
-    escan.output_result()
+    if args.output_path:
+        escan.output_result()
 
 if __name__ == '__main__':
     main()
