@@ -90,7 +90,7 @@ class Escan():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', dest="target_domain", type=str, help="target domain")
+    parser.add_argument('-d', dest="target_domain", type=str, help="target domain", required=True)
     parser.add_argument('-o', dest="output_path", type=str, help="output path")
     parser.add_argument('-e', dest="show_expired", action="store_true", help="show expired")
     parser.add_argument('-D', dest="subdomain_dict", type=str, help="subdomain dict path")
@@ -98,9 +98,9 @@ def main():
 
     escan = Escan(args.target_domain, args.output_path, args.show_expired, args.subdomain_dict)
 
-    print("[*] start dns scan")
+    print(">> start dns scan ...")
     escan.dns_scan()
-    print("[*] start ctfr scan")
+    print(">> start ctfr scan ...")
     escan.ctfr_scan()
     if args.output_path:
         escan.output_result()
